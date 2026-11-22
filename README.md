@@ -56,7 +56,7 @@ winget install --id MaaAssistantArknights.maa-cli -e --source winget   # 指令�
 # 以系統管理員身分執行一次（MaaCore 需要 VC++ 執行庫）：
 winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
 maa-cli install                         # 下載 MaaCore + 資源
-git clone https://github.com/<你的帳號>/ark-dsh.git
+git clone https://github.com/bingtony7462-eng/ark-dsh.git
 cd ark-dsh
 npm install
 npm test
