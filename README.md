@@ -15,16 +15,65 @@
 
 P0 只註冊三個唯讀工具：`ark_status`、`ark_screenshot`、`maa_probe`。沒有任何會戰鬥、消費或點擊的工具。
 
-## 安裝
+## 安裝：先選你的系統
 
-需要 Node ≥ 22.5（使用內建 `node:sqlite`）。
+> 這個插件**必須搭配 MAA 使用**：需要 maa-cli（命令列）+ MaaCore（核心）+ 資源檔。
+> **macOS 和 Windows 要下載不同版本的 maa-cli**，請只照你那台電腦的段落做，不要混用。
+
+| 你的電腦 | 遊戲怎麼跑 | maa-cli 安裝方式 | 安裝後的指令名 | 驗收用 `--runtime` |
+|---|---|---|---|---|
+| macOS（Apple Silicon） | PlayCover 或 Android 模擬器 | Homebrew | `maa` | `playcover` / `adb` |
+| Windows 10/11（x64） | 官方 PC 客戶端（GRYPHLINK 啟動器）或 MuMu 12 | winget | `maa-cli` | `win32` / `adb` |
+
+不用另外設定指令名：`ark-maa` 會先找 `maa`，找不到再找 `maa-cli`。
+
+### macOS 版（終端機）
 
 ```sh
+# 1. Node ≥ 22.5（使用內建 node:sqlite）
+brew install node
+# 2. macOS 版 maa-cli（不要下載 Windows 的 .exe / .zip）
+brew install MaaAssistantArknights/tap/maa-cli
+# 3. MaaCore + 資源
+maa install
+maa version            # 確認 MaaCore 已就緒
+# 4. 本插件
+git clone https://github.com/bingtony7462-eng/ark-dsh.git
 cd ark-dsh
 npm install
-npm run typecheck
-npm test            # 模擬測試（假的 maa/adb，真實 dsh ToolRegistry）
+npm test
 ```
+
+接著做下方「P0 實機驗收（Mac）」。
+
+### Windows 版（PowerShell，以系統管理員身分執行）
+
+```powershell
+# 1. Node ≥ 22.5
+winget install OpenJS.NodeJS.LTS
+# 2. Windows 版 maa-cli（不要用 brew，也不要下載 macOS / Linux 版）
+winget install --id MaaAssistantArknights.maa-cli -e --source winget
+# 3. MaaCore 需要 VC++ 執行庫（管理員）
+winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
+# 4. 重新開一個 PowerShell 視窗讓 PATH 生效，再安裝 MaaCore + 資源
+maa-cli install
+maa-cli version        # 確認 MaaCore 已就緒
+# 5. 本插件
+git clone https://github.com/bingtony7462-eng/ark-dsh.git
+cd ark-dsh
+npm install
+npm test
+```
+
+注意：
+- winget 裝的指令名是 **`maa-cli`**，不是 `maa`；更新請用 `winget upgrade MaaAssistantArknights.maa-cli`，不要用 `maa self update`。
+- 不想用 winget 時，可改用官方安裝腳本（裝完指令名是 `maa`）：
+  `Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.ps1" -OutFile install.ps1; .\install.ps1`
+- 這裡裝的是 **maa-cli**，不是 MAA 圖形版（`MaaAssistantArknights.MaaAssistantArknights`）。圖形版本插件用不到。
+
+接著做下方「Windows + 官方 PC 客戶端（台服）」的驗收。
+
+官方安裝說明：[maa-cli 安裝與編譯](https://docs.maa.plus/en-us/manual/cli/install.html)。
 
 ## P0 實機驗收（Mac）
 
@@ -48,19 +97,7 @@ PlayCover 注意：讀取視窗標題需要「系統設定 → 隱私權與安�
 
 適用：用 GRYPHLINK（鷹角英文版）啟動器開的台服 PC 版。
 
-### 安裝（PowerShell）
-
-```powershell
-winget install OpenJS.NodeJS.LTS        # 需要 Node ≥ 22.5
-winget install --id MaaAssistantArknights.maa-cli -e --source winget   # 指令名是 maa-cli，不是 maa
-# 以系統管理員身分執行一次（MaaCore 需要 VC++ 執行庫）：
-winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
-maa-cli install                         # 下載 MaaCore + 資源
-git clone https://github.com/bingtony7462-eng/ark-dsh.git
-cd ark-dsh
-npm install
-npm test
-```
+安裝請看上方「Windows 版」。
 
 ### P0 實機驗收
 
