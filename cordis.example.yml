@@ -1,0 +1,43 @@
+# ark-dsh 插件組（P0）。用法：pnpm dsh web --patch /ABS/PATH/ark-dsh/cordis.yml
+# 1. 把 /ABS/PATH（Windows 例：C:/Users/你/ark-dsh，用正斜線） 換成 ark-dsh 的絕對路徑（插件路徑必須是絕對路徑）。
+# 2. 每個插件可單獨停用：在該列加 `disabled: true`（cordis loader 的 disabled 欄位）。
+# 3. ark-core 必須最先啟用；其餘插件 inject 了 ark 服務。
+- insert:
+    - id: ark-core
+      name: '/ABS/PATH/ark-dsh/src/ark-core/index.ts'
+      config:
+        server: unset        # cn / tw / global / jp —— 開工前填寫
+        runtime: unset       # playcover / adb / win32（Windows 官方 PC 客戶端）—— 開工前填寫
+        account: ''          # 帳號標識（之後用於帳號不符熔斷）
+        timezone: Asia/Hong_Kong
+    - id: ark-device
+      name: '/ABS/PATH/ark-dsh/src/ark-device/index.ts'
+      config:
+        backend: auto        # 跟隨 ark-core.runtime
+        playcover:
+          address: ''        # 留空則從遊戲視窗標題 [localhost:端口] 讀取
+        adb:
+          adbPath: adb
+          serial: ''         # 例：127.0.0.1:16384（MuMu Pro / MuMu 12）
+        win32:
+          windowTitles: ['明日方舟', 'Arknights']   # 標題完全相符；以實際遊戲視窗為準
+          processName: ''    # 多個同名視窗時用來消歧義，例：Arknights.exe
+    - id: ark-maa
+      name: '/ABS/PATH/ark-dsh/src/ark-maa/index.ts'
+      config:
+        binary: maa
+        fallbackBinary: maa-cli
+        profile: default
+    # 以下為階段鎖定的佔位插件：不註冊工具，只在 ark_status 中顯示階段。
+    - id: ark-guard
+      name: '/ABS/PATH/ark-dsh/src/ark-guard/index.ts'
+    - id: ark-box
+      name: '/ABS/PATH/ark-dsh/src/ark-box/index.ts'
+    - id: ark-guide
+      name: '/ABS/PATH/ark-dsh/src/ark-guide/index.ts'
+    - id: ark-copilot
+      name: '/ABS/PATH/ark-dsh/src/ark-copilot/index.ts'
+    - id: ark-planner
+      name: '/ABS/PATH/ark-dsh/src/ark-planner/index.ts'
+    - id: ark-strategy
+      name: '/ABS/PATH/ark-dsh/src/ark-strategy/index.ts'

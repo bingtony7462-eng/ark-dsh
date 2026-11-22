@@ -1,0 +1,26 @@
+{
+  "name": "ark-dsh",
+  "version": "0.1.0-p0",
+  "private": true,
+  "type": "module",
+  "description": "明日方舟自動遊玩 dsh 插件組（v1.1，P0 階段）",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test --test-reporter=spec test/*.test.ts",
+    "p0": "node --import tsx scripts/p0-acceptance.ts"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-tools": "0.0.1-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "*",
+    "@deepseek-ai/schemastery": "*",
+    "@types/node": "^22.10.0",
+    "@types/pngjs": "^6.0.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}
