@@ -1,0 +1,34 @@
+# ark-dsh 標準 dsh bundle 自動掛載層（隨插即用，免手改路徑）
+# 安裝指令：dsh plugin --profile web add github:bingtony7462-eng/ark-dsh
+# 或本地目錄：dsh plugin --profile web add ./ark-dsh
+# 九個獨立 Cordis 插件各自擁有獨立 id，使用者可在自己的 profile cordis.patch.yml 單獨覆寫 config 或設 disabled: true。
+- insert:
+    - id: ark-core
+      name: 'ark-dsh/ark-core'
+      config:
+        server: unset        # 可在對話裡請 AI 呼叫 ark_configure 設定（如 tw），免手改設定檔
+        runtime: auto        # 隨插即用：依 Windows / macOS 自動偵測遊戲視窗或模擬器
+        account: ''
+        timezone: Asia/Hong_Kong
+    - id: ark-device
+      name: 'ark-dsh/ark-device'
+      config:
+        backend: auto
+    - id: ark-maa
+      name: 'ark-dsh/ark-maa'
+      config:
+        binary: maa
+        fallbackBinary: maa-cli
+        profile: default
+    - id: ark-guard
+      name: 'ark-dsh/ark-guard'
+    - id: ark-box
+      name: 'ark-dsh/ark-box'
+    - id: ark-guide
+      name: 'ark-dsh/ark-guide'
+    - id: ark-copilot
+      name: 'ark-dsh/ark-copilot'
+    - id: ark-planner
+      name: 'ark-dsh/ark-planner'
+    - id: ark-strategy
+      name: 'ark-dsh/ark-strategy'

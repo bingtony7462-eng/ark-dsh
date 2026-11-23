@@ -1,9 +1,9 @@
 /**
- * P0 實機驗收腳本（在你的 Mac 上執行，不經 dsh 模型、不操作遊戲）：
- *   npm run p0 -- --server tw --runtime playcover
+ * P0 實機驗收腳本（在你的電腦上執行，不經 dsh 模型、不操作遊戲）：
+ *   npm run p0                                           （隨插即用：自動偵測本機視窗 / 模擬器；伺服器預設 tw）
+ *   npm run p0 -- --server tw --runtime win32            （明確指定 Windows 官方 PC 客戶端）
+ *   npm run p0 -- --server tw --runtime playcover        （明確指定 Mac PlayCover）
  *   npm run p0 -- --server tw --runtime adb --adb-serial 127.0.0.1:16384
- *   npm run p0 -- --server tw --runtime win32            （Windows 官方 PC 客戶端，先手動開好遊戲）
- *   npm run p0 -- --server tw --runtime win32 --window-title 明日方舟 --process-name Arknights.exe
  * 以真實 dsh ToolRegistry 載入九個插件並呼叫 ark_status，報告寫入
  * 資料目錄的 acceptance/p0-<時間>.json（macOS：~/Library/Application Support/ark-dsh；Windows：%APPDATA%\\ark-dsh）。
  */
@@ -24,8 +24,8 @@ import * as planner from '../src/ark-planner/index.ts'
 import * as strategy from '../src/ark-strategy/index.ts'
 
 const { values } = parseArgs({ options: {
-  server: { type: 'string', default: 'unset' },
-  runtime: { type: 'string', default: 'unset' },
+  server: { type: 'string', default: 'tw' },
+  runtime: { type: 'string', default: 'auto' },
   'adb-path': { type: 'string', default: 'adb' },
   'adb-serial': { type: 'string', default: '' },
   'playcover-address': { type: 'string', default: '' },
@@ -34,8 +34,8 @@ const { values } = parseArgs({ options: {
   'data-dir': { type: 'string', default: core.DEFAULT_DATA_DIR },
 } })
 
-if (!['cn', 'tw', 'global', 'jp'].includes(values.server!)) { console.error('--server 必須是 cn / tw / global / jp'); process.exit(2) }
-if (!['playcover', 'adb', 'win32'].includes(values.runtime!)) { console.error('--runtime 必須是 playcover / adb / win32'); process.exit(2) }
+if (!['cn', 'tw', 'global', 'jp', 'unset'].includes(values.server!)) { console.error('--server 必須是 cn / tw / global / jp'); process.exit(2) }
+if (!['auto', 'playcover', 'adb', 'win32'].includes(values.runtime!)) { console.error('--runtime 必須是 auto / playcover / adb / win32'); process.exit(2) }
 
 const tick = () => new Promise(r => setTimeout(r, 50))
 const ctx = new Context()
@@ -55,7 +55,7 @@ const v = r.value as any
 const verdict = {
   maa_found: v.maa.found === true,
   maa_core_ready: v.maa.core_ready === true,
-  device_connected: v.device.backends?.[v.device.active_backend]?.connected === true,
+  device_connected: v.device.active_backend ? v.device.backends?.[v.device.active_backend]?.connected === true : false,
   screenshot_valid: v.device.screenshot?.valid === true,
   sqlite_ok: v.storage.sqlite === 'ok',
 }
@@ -65,5 +65,15 @@ const out = join(values['data-dir'], 'acceptance')
 mkdirSync(out, { recursive: true })
 const file = join(out, `p0-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
 writeFileSync(file, JSON.stringify({ kind: 'real_machine', pass, verdict, platform: process.platform, node: process.version, status: v }, null, 2))
-console.log(JSON.stringify({ pass, verdict, execution_path: v.maa.execution_path ?? null, win32: v.device.backends?.win32?.detail ?? null, report: file, screenshot: v.device.screenshot?.path ?? null, error: v.device.error }, null, 2))
+console.log(JSON.stringify({
+  pass,
+  verdict,
+  active_backend: v.device.active_backend ?? null,
+  execution_path: v.maa.execution_path ?? null,
+  maa_install_hint: v.maa.install_hint ?? null,
+  win32: v.device.backends?.win32?.detail ?? null,
+  report: file,
+  screenshot: v.device.screenshot?.path ?? null,
+  error: v.device.error,
+}, null, 2))
 process.exit(pass ? 0 : 1)

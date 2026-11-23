@@ -123,10 +123,10 @@ test('找不到 maa 時回報 found=false', { skip: skipShell }, async () => {
   await b.dispose()
 })
 
-test('P0 工具面：只有唯讀工具；無戰鬥/消費/點擊工具', async () => {
+test('P0 工具面：只有唯讀與設定工具；無戰鬥/消費/點擊工具', async () => {
   const b = await boot()
   const names = b.ctx.tools.schemas().map(s => s.name).sort()
-  assert.deepEqual(names, ['ark_screenshot', 'ark_status', 'maa_probe'])
+  assert.deepEqual(names, ['ark_configure', 'ark_screenshot', 'ark_status', 'maa_probe'])
   for (const n of ['maa_fight', 'maa_copilot', 'device_tap', 'device_swipe', 'maa_daily']) {
     const r = await b.call(n)
     assert.equal(r.isError, true)
