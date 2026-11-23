@@ -13,7 +13,7 @@ import type { BackendProbe, Capture, DeviceBackend } from './backends.ts'
 export interface Win32Config {
   /** 視窗標題完全相符才算（MAA GUI 預設找「明日方舟」）；可多個候選。 */
   windowTitles: string[]
-  /** 選填：用執行檔名稱再過濾一次（例如 Arknights.exe），避免同名視窗。 */
+  /** 選填：用執行檔名稱再過濾一次（例如 Arknights.exe），避免不同程式同名視窗。 */
   processName: string
 }
 
@@ -52,9 +52,15 @@ public static class ArkW32 {
   public static string Title(IntPtr h) { var sb = new StringBuilder(512); GetWindowTextW(h, sb, 512); return sb.ToString(); }
 }`
 
-/** 列出標題完全相符的頂層視窗；輸出 JSON。 */
-export const PS_SCAN = `
+/** PowerShell 5.1 預設用 OEM 碼頁（繁中 950 / 英文 437）寫 stdout，必須強制設為 UTF-8 否則中文標題會亂碼或撐破 JSON。 */
+const PS_UTF8_PRELUDE = `
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
+`
+
+/** 列出標題完全相符的頂層視窗；輸出 UTF-8 JSON。 */
+export const PS_SCAN = `${PS_UTF8_PRELUDE}
 Add-Type -TypeDefinition @'
 ${CSHARP}
 '@ -ReferencedAssemblies System.Drawing
@@ -66,7 +72,7 @@ foreach ($h in [ArkW32]::TopLevel()) {
   if ($titles -notcontains $t) { continue }
   $procId = [uint32]0; [void][ArkW32]::GetWindowThreadProcessId($h, [ref]$procId)
   $pname = $null; $exe = $null
-  try { $p = Get-Process -Id $procId; $pname = $p.ProcessName; $exe = $p.Path } catch {}
+  try { $p = Get-Process -Id $procId -ErrorAction Stop; $pname = $p.ProcessName; $exe = $p.Path } catch {}
   $r = New-Object ArkW32+RECT; [void][ArkW32]::GetClientRect($h, [ref]$r)
   $out += [pscustomobject]@{ hwnd = [string]$h.ToInt64(); title = $t; pid = [int]$procId; process = $pname; exe = $exe;
     visible = [ArkW32]::IsWindowVisible($h); minimized = [ArkW32]::IsIconic($h); client_w = $r.R - $r.L; client_h = $r.B - $r.T }
@@ -75,8 +81,7 @@ foreach ($h in [ArkW32]::TopLevel()) {
 `
 
 /** 以 PrintWindow(PW_CLIENTONLY | PW_RENDERFULLCONTENT) 截取客戶區到 PNG。 */
-export const PS_CAPTURE = `
-$ErrorActionPreference = 'Stop'
+export const PS_CAPTURE = `${PS_UTF8_PRELUDE}
 Add-Type -TypeDefinition @'
 ${CSHARP}
 '@ -ReferencedAssemblies System.Drawing
@@ -100,15 +105,41 @@ export type PsRunner = (script: string, env: Record<string, string>, signal: Abo
 export const defaultPsRunner: PsRunner = (script, env, signal) =>
   run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { timeoutMs: 30_000, signal, env: { ...process.env, ...env } })
 
-/** 純程式碼：從掃描結果選出唯一目標視窗；有歧義就失敗，不猜。 */
+/**
+ * 純程式碼：從掃描結果選出唯一目標視窗。
+ * 實機上官方 PC 版常伴隨一個隱藏的 640×480 同名佔位視窗（同一個 process）；
+ * 且非管理員權限下對 ACE 提權進程呼叫 Get-Process 會拿不到 process（為 null）。
+ * 因此：
+ * 1. 若有設 processName，只在至少有一個視窗讀得到 process 時才過濾；若全部 process 都是 null（因未提權被拒），不誤殺全部候選。
+ * 2. 多個同名視窗時，優先篩選 `visible && (minimized || (client_w >= 960 && client_h >= 540))` 以排除 640×480 隱藏佔位窗；篩完剛好 1 個就選中，仍 >1 才報錯不猜。
+ */
 export function selectWindow(scan: Win32Scan, cfg: Win32Config): { window: Win32Window | null; error: string | null } {
   let c = scan.windows
+  if (c.length === 0) {
+    return { window: null, error: `找不到標題為 ${cfg.windowTitles.map(t => `「${t}」`).join(' / ')} 的遊戲視窗（遊戲需先手動啟動）` }
+  }
   if (cfg.processName) {
     const want = cfg.processName.toLowerCase().replace(/\.exe$/, '')
-    c = c.filter(w => (w.process ?? '').toLowerCase() === want)
+    const readable = c.some(w => w.process !== null && w.process !== '')
+    if (readable) {
+      c = c.filter(w => (w.process ?? '').toLowerCase() === want)
+      if (c.length === 0) {
+        return { window: null, error: `找到同名視窗但執行檔不是 ${cfg.processName}` }
+      }
+    }
   }
-  if (c.length === 0) return { window: null, error: `找不到標題為 ${cfg.windowTitles.map(t => `「${t}」`).join(' / ')} 的遊戲視窗（遊戲需先手動啟動）` }
-  if (c.length > 1) return { window: null, error: `找到 ${c.length} 個同名視窗，請在設定 win32.processName 指定執行檔` }
+  if (c.length > 1) {
+    // 排除隱藏視窗與 640x480 佔位小窗（保留已最小化的主視窗以便回報「視窗已最小化」）
+    const mainCandidates = c.filter(w => w.visible && (w.minimized || (w.client_w >= 960 && w.client_h >= 540)))
+    if (mainCandidates.length === 1) {
+      return { window: mainCandidates[0]!, error: null }
+    }
+    const targetList = mainCandidates.length > 1 ? mainCandidates : c
+    const adminHint = !scan.is_admin && scan.windows.every(w => !w.process)
+      ? '（目前非系統管理員權限，無法讀取提權進程名稱；請以系統管理員身分啟動 dsh / PowerShell）'
+      : '（若為不同程式，可在 win32.processName 指定執行檔）'
+    return { window: null, error: `找到 ${targetList.length} 個候選同名視窗，無法唯一識別${adminHint}` }
+  }
   return { window: c[0]!, error: null }
 }
 
@@ -126,7 +157,7 @@ export class Win32Backend implements DeviceBackend {
     const r = await this.ps(PS_SCAN, { ARK_W32_TITLES: JSON.stringify(this.cfg.windowTitles) }, signal)
     if (!r.ok) return { scan: null, error: `PowerShell 掃描視窗失敗：${r.error ?? r.stderr.slice(0, 300)}` }
     try {
-      const raw = JSON.parse(r.stdout.toString('utf8').trim()) as { is_admin: boolean; windows: Win32Window[] | Win32Window | null }
+      const raw = JSON.parse(r.stdout.toString('utf8').replace(/^\uFEFF/, '').trim()) as { is_admin: boolean; windows: Win32Window[] | Win32Window | null }
       const windows = raw.windows == null ? [] : Array.isArray(raw.windows) ? raw.windows : [raw.windows]
       return { scan: { is_admin: !!raw.is_admin, windows }, error: null }
     } catch { return { scan: null, error: 'PowerShell 輸出不是 JSON' } }
@@ -139,12 +170,12 @@ export class Win32Backend implements DeviceBackend {
     const ratio = window && window.client_h > 0 ? window.client_w / window.client_h : null
     const detail: Record<string, unknown> = {
       is_admin: scan.is_admin,
-      candidates: scan.windows.map(w => ({ hwnd: w.hwnd, title: w.title, process: w.process, minimized: w.minimized })),
+      candidates: scan.windows.map(w => ({ hwnd: w.hwnd, title: w.title, process: w.process, visible: w.visible, minimized: w.minimized, size: `${w.client_w}x${w.client_h}` })),
       window: window ?? null,
       client_size: window ? `${window.client_w}x${window.client_h}` : null,
       aspect_16_9: ratio === null ? null : Math.abs(ratio - 16 / 9) < 0.005,
-      // MAA GUI 的 PC 端連線需要系統管理員權限（AttachWindowNeedAdmin）；P0 只回報，不提權。
-      admin_note: scan.is_admin ? null : 'MAA 連接 PC 端需以系統管理員身分執行',
+      // MAA 與官方 PC 客戶端（ACE 提權）在非管理員下 PrintWindow / 進程讀取可能被拒；明確標出提示。
+      admin_note: scan.is_admin ? null : '目前非系統管理員權限：對 ACE 提權的官方 PC 客戶端截圖或連接可能被系統拒絕，請以系統管理員身分啟動 dsh / PowerShell',
     }
     if (!window) return { backend: 'win32', tested: true, connected: false, address: null, detail, error: selErr }
     let err: string | null = null
@@ -163,7 +194,13 @@ export class Win32Backend implements DeviceBackend {
     const tmp = join(tmpdir(), `ark-w32-${process.pid}-${Date.now()}.png`)
     const r = await this.ps(PS_CAPTURE, { ARK_W32_HWND: window.hwnd, ARK_W32_OUT: tmp }, signal)
     try {
-      if (!r.ok) return { png: null, error: `PrintWindow 截圖失敗：${r.error ?? r.stderr.slice(0, 300)}`, method }
+      if (!r.ok) {
+        const rawErr = (r.error ?? r.stderr.slice(0, 300)).trim()
+        const adminHint = !scan.is_admin
+          ? '（偵測到目前不是系統管理員權限：官方 PC 客戶端受 ACE 提權保護，未提權時 PrintWindow 會回傳 false；請以「系統管理員身分」重新啟動 dsh 或終端機）'
+          : ''
+        return { png: null, error: `PrintWindow 截圖失敗：${rawErr}${adminHint}`, method }
+      }
       return { png: readFileSync(tmp), error: null, method }
     } catch (e) { return { png: null, error: (e as Error).message, method } }
     finally { rmSync(tmp, { force: true }) }

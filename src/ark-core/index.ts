@@ -10,7 +10,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { ArkStore } from './store.ts'
-import { jsonRender, openObject, asJson } from '../shared/tool-helpers.ts'
+import { jsonRender, openObject, asJson, registerArkTool } from '../shared/tool-helpers.ts'
 
 export type Server = 'cn' | 'tw' | 'global' | 'jp' | 'unset'
 export type Runtime = 'auto' | 'playcover' | 'adb' | 'win32' | 'unset'
@@ -122,7 +122,7 @@ export const statusPlugin = {
   name: 'ark-core-status',
   inject: ['tools', 'ark'] as const,
   apply(ctx: Context) {
-    ctx.effect(() => ctx.tools.register(defineTool({
+    ctx.effect(() => registerArkTool(ctx, { module: 'ark-core', tier: 'query' }, defineTool({
       name: 'ark_status',
       description: '明日方舟插件總覽：設定、儲存、MAA、裝置連線與截圖、各模組階段。唯讀，不操作遊戲。支援隨插即用自動偵測。',
       parameters: {
@@ -177,7 +177,7 @@ export const statusPlugin = {
       },
     })))
 
-    ctx.effect(() => ctx.tools.register(defineTool({
+    ctx.effect(() => registerArkTool(ctx, { module: 'ark-core', tier: 'configure' }, defineTool({
       name: 'ark_configure',
       description: '在對話中直接檢視或儲存明日方舟插件設定（伺服器、運行方式、視窗標題、ADB 序號等），立即生效並持久化至本機 SQLite，無需手改 cordis.yml 或重啟 dsh。不操作遊戲。',
       parameters: {
@@ -235,3 +235,6 @@ export function apply(ctx: Context, config: ArkCoreConfig) {
   ctx.plugin(ArkCore, config)
   ctx.plugin(statusPlugin)
 }
+
+export { registerArkTool, getArkToolDeclaration, listArkToolDeclarations, type ArkToolMeta, type ArkToolTier } from '../shared/tool-helpers.ts'
+

@@ -106,7 +106,8 @@ npm run p0             # 隨插即用：預設 server=tw、runtime=auto 自動�
 
 ### 截圖方式與 Windows 執行路徑限制（P1 前要決定）
 
-- **截圖**：Windows 用 PowerShell + Win32 `PrintWindow`（只讀，不送任何點擊/按鍵）。若硬體加速導致截到全黑畫面，`ark_status` 會如實回報「畫面全黑」，不會假裝成功。台服 PC 版有 ACE 反作弊，P0 只讀畫面；之後若要送輸入，風險需自行評估。
+- **截圖**：Windows 用 PowerShell + Win32 `PrintWindow`（強制 UTF-8 輸出，並自動濾除官方啟動器的 640×480 隱藏佔位視窗；只讀畫面，不送任何點擊/按鍵）。
+- **管理員權限（ACE 提權）**：台服官方 PC 版帶 ACE 反作弊並以管理員權限運行；若 dsh 或 PowerShell 不是以系統管理員身分啟動，`PrintWindow` 會回傳 `false`，此時插件會明確提示請以系統管理員身分啟動。若提權後硬體加速仍導致截到全黑畫面，`ark_status` 會如實回報「畫面全黑」，不會假裝成功。P0 只讀畫面；之後若要送輸入，風險需自行評估。
 - **P1 執行路徑**：**maa-cli 穩定版還不支援連接 PC 客戶端**（PR #543 / #575 尚未合併），所以 `ark_status.maa.execution_path` 在 `win32` 會如實回報 `blocked`。進入 P1 前請三選一：
   - **A. MuMu 12 + ADB**：在 Windows 裝 MuMu 12 跑台服 Android 版（MAA 官方推薦、最穩）。
   - **B. 自建 MaaCore 橋接**：`ark-maa` 直接載入 `MaaCore.dll` 呼叫 `AsstAttachWindow`（不經 maa-cli，需較多實機測試）。

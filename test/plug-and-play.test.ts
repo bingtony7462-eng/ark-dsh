@@ -8,6 +8,9 @@ import { boot, makePng } from './helpers.ts'
 import { ArkDevice, autoOrder } from '../src/ark-device/index.ts'
 import { Win32Backend, PS_SCAN, PS_CAPTURE, type PsRunner } from '../src/ark-device/win32.ts'
 import { extraMaaCandidates } from '../src/ark-maa/index.ts'
+import { run } from '../src/shared/exec.ts'
+import { getArkToolDeclaration, jsonRender, openObject } from '../src/shared/tool-helpers.ts'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const good = makePng(1920, 1080, (x, y) => [(x * 11) % 256, (y * 7) % 256, 140])
@@ -97,3 +100,57 @@ test('dsh.bundle 清單與預編譯契約：package.json、cordis.patch.yml 與�
     }
   }
 })
+
+test('exec.run：spawn 同步拋錯時不會觸發 timer TDZ ReferenceError，而是乾淨回傳 { ok: false, error }', async () => {
+  // 傳入含 NUL 字元的路徑會使 Node child_process.spawn 在 try 區塊內同步拋出 ERR_INVALID_ARG_VALUE
+  const res = await run('bad\0binary', [])
+  assert.equal(res.ok, false)
+  assert.equal(res.code, null)
+  assert.equal(res.timedOut, false)
+  assert.ok(typeof res.error === 'string' && res.error.length > 0)
+})
+
+test('registerArkTool 宣告表契約：ark_configure 等四個 P0 工具皆已進宣告表，門禁 fail-closed 放行已宣告工具並攔截未宣告工具', async () => {
+  const b = await boot({ server: 'tw', runtime: 'adb' })
+  try {
+    assert.deepEqual(getArkToolDeclaration('ark_status'), { name: 'ark_status', module: 'ark-core', tier: 'query' })
+    assert.deepEqual(getArkToolDeclaration('ark_configure'), { name: 'ark_configure', module: 'ark-core', tier: 'configure' })
+    assert.deepEqual(getArkToolDeclaration('ark_screenshot'), { name: 'ark_screenshot', module: 'ark-device', tier: 'query' })
+    assert.deepEqual(getArkToolDeclaration('maa_probe'), { name: 'maa_probe', module: 'ark-maa', tier: 'query' })
+
+    // 模擬 P1 ark-guard 的 fail-closed 門禁：ark_/maa_/device_ 前綴但未進宣告表 → 回傳拒絕原因字串；query / configure → undefined（放行）
+    const disposeGuard = b.ctx.tools.guard(call => {
+      if (/^(ark_|maa_|device_)/.test(call.name)) {
+        const meta = getArkToolDeclaration(call.name)
+        if (!meta) return `未在宣告表登記的工具：${call.name}`
+        if (meta.tier === 'query' || meta.tier === 'configure') return undefined
+        return 'P0 僅允許 query / configure'
+      }
+      return undefined
+    })
+
+    // 註冊一個繞過 registerArkTool 的未宣告工具
+    const disposeRogue = b.ctx.tools.register(defineTool({
+      name: 'ark_undeclared_rogue',
+      description: 'rogue tool bypassing registerArkTool',
+      parameters: {},
+      output: { schema: openObject, render: jsonRender },
+      async execute() { return { ok: true } },
+    }))
+
+    // ark_configure 已進宣告表，載入門禁後仍正常放行
+    const okCfg = await b.call('ark_configure', { server: 'tw' })
+    assert.equal(okCfg.isError, false)
+    assert.equal((okCfg.value as any).ok, true)
+
+    // 未進宣告表的 ark_ 前綴工具被門禁 fail-closed 攔截
+    const denied = await b.call('ark_undeclared_rogue', {})
+    assert.equal(denied.isError, true)
+
+    disposeRogue()
+    disposeGuard()
+  } finally {
+    await b.dispose()
+  }
+})
+

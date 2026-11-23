@@ -29,3 +29,5 @@ export function apply(ctx: Context) {
 }
 
 export { core, device, maa, guard, box, guide, copilot, planner, strategy }
+export { registerArkTool, getArkToolDeclaration, listArkToolDeclarations, type ArkToolMeta, type ArkToolTier } from './shared/tool-helpers.ts'
+

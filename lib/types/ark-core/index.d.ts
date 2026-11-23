@@ -74,3 +74,4 @@ export declare const name = "ark-core";
 export declare const inject: string[];
 export declare const Config: z<ArkCoreConfig>;
 export declare function apply(ctx: Context, config: ArkCoreConfig): void;
+export { registerArkTool, getArkToolDeclaration, listArkToolDeclarations, type ArkToolMeta, type ArkToolTier } from '../shared/tool-helpers.ts';

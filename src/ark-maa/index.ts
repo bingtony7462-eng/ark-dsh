@@ -10,7 +10,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { run } from '../shared/exec.ts'
 import { parseHelpCommands, parseVersions, deriveRoutes, executionPath } from './probe.ts'
-import { jsonRender, openObject, asJson } from '../shared/tool-helpers.ts'
+import { jsonRender, openObject, asJson, registerArkTool } from '../shared/tool-helpers.ts'
 import type {} from '../ark-core/index.ts'
 
 export interface ArkMaaConfig { binary: string; fallbackBinary: string; profile: string }
@@ -150,7 +150,7 @@ export const toolsPlugin = {
   name: 'ark-maa-tools',
   inject: ['tools', 'arkMaa'] as const,
   apply(ctx: Context) {
-    ctx.effect(() => ctx.tools.register(defineTool({
+    ctx.effect(() => registerArkTool(ctx, { module: 'ark-maa', tier: 'query' }, defineTool({
       name: 'maa_probe',
       description: '探測本機 maa-cli：版本、MaaCore 是否就緒、實際子命令清單與各功能應走的命令（含自動搜尋 winget / Homebrew 安裝路徑）。唯讀。',
       parameters: {},

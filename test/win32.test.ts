@@ -28,11 +28,70 @@ function fakePs(windows: Win32Window[], png: string, isAdmin = true): PsRunner &
   return fn
 }
 
-test('selectWindow：0 個 / 多個同名 / 用執行檔名稱消歧義', () => {
+test('selectWindow：0 個 / 多個同名 / 用執行檔名稱消歧義 / 排除 640x480 隱藏佔位窗與未提權 null process', () => {
   assert.match(selectWindow({ is_admin: true, windows: [] }, cfg).error!, /找不到/)
   const two = { is_admin: true, windows: [win(), win({ hwnd: '9', process: 'notepad' })] }
-  assert.match(selectWindow(two, cfg).error!, /2 個同名視窗/)
+  assert.match(selectWindow(two, cfg).error!, /2 個候選同名視窗/)
   assert.equal(selectWindow(two, { ...cfg, processName: 'Arknights.exe' }).window?.hwnd, '1311234')
+
+  // 實機情境 B1：官方 PC 版同時存在 1920x1080 遊戲主窗 + 640x480 隱藏佔位窗（同一個 process）
+  const realAndHiddenPlaceholder = {
+    is_admin: true,
+    windows: [
+      win({ hwnd: '55501', visible: false, client_w: 640, client_h: 480 }),
+      win({ hwnd: '55502', visible: true, client_w: 1920, client_h: 1080 }),
+    ],
+  }
+  assert.equal(selectWindow(realAndHiddenPlaceholder, cfg).window?.hwnd, '55502')
+
+  // 實機情境 B2：即使佔位窗 visible=true 但尺寸只有 640x480，同樣自動選中 >=960x540 的遊戲主窗
+  const realAndSmallPlaceholder = {
+    is_admin: true,
+    windows: [
+      win({ hwnd: '55503', visible: true, client_w: 640, client_h: 480 }),
+      win({ hwnd: '55504', visible: true, client_w: 1280, client_h: 720 }),
+    ],
+  }
+  assert.equal(selectWindow(realAndSmallPlaceholder, cfg).window?.hwnd, '55504')
+
+  // 實機情境 B3：非系統管理員下 ACE 提權進程使 Get-Process 被拒（process 全為 null），即使設了 processName 也不會把候選濾光
+  const nonAdminAce = {
+    is_admin: false,
+    windows: [
+      win({ hwnd: '66601', process: null, exe: null, visible: false, client_w: 640, client_h: 480 }),
+      win({ hwnd: '66602', process: null, exe: null, visible: true, client_w: 1920, client_h: 1080 }),
+    ],
+  }
+  assert.equal(selectWindow(nonAdminAce, { ...cfg, processName: 'Arknights.exe' }).window?.hwnd, '66602')
+})
+
+test('PS_SCAN / PS_CAPTURE：開頭強制設定 Console::OutputEncoding 與 $OutputEncoding 為 UTF-8，且 scan 相容 UTF-8 BOM', async () => {
+  for (const script of [PS_SCAN, PS_CAPTURE]) {
+    assert.match(script, /\[Console\]::OutputEncoding\s*=\s*\[System\.Text\.Encoding\]::UTF8/)
+    assert.match(script, /\$OutputEncoding\s*=\s*\[System\.Text\.Encoding\]::UTF8/)
+  }
+  const psWithBom: PsRunner = async () => ({
+    ok: true,
+    code: 0,
+    stdout: Buffer.from('\uFEFF' + JSON.stringify({ is_admin: true, windows: win({ title: '明日方舟' }) }), 'utf8'),
+    stderr: '',
+    timedOut: false,
+  })
+  const b = new Win32Backend(cfg, psWithBom, 'win32')
+  const s = await b.scan(new AbortController().signal)
+  assert.equal(s.error, null)
+  assert.equal(s.scan?.windows[0]?.title, '明日方舟')
+})
+
+test('Win32 截圖：非管理員下 PrintWindow 失敗時明確提示 ACE 提權需系統管理員身分', async () => {
+  const psFailPrint: PsRunner = async (script) => {
+    if (script === PS_SCAN) return ok(JSON.stringify({ is_admin: false, windows: win({ process: null }) }))
+    return { ok: false, code: 1, stdout: Buffer.alloc(0), stderr: 'PrintWindow returned false', timedOut: false }
+  }
+  const cap = await new Win32Backend(cfg, psFailPrint, 'win32').screenshot(new AbortController().signal)
+  assert.equal(cap.png, null)
+  assert.match(cap.error!, /PrintWindow returned false/)
+  assert.match(cap.error!, /系統管理員/)
 })
 
 test('Win32 探測：正常視窗 → connected；標題以環境變數傳入，不拼進腳本', async () => {

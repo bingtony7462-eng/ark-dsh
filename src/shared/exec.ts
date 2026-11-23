@@ -22,11 +22,18 @@ export function run(bin: string, args: readonly string[], opts: ExecOptions = {}
   const maxBytes = opts.maxBytes ?? 32 * 1024 * 1024
   return new Promise(resolve => {
     let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
     const out: Buffer[] = []
     let outLen = 0
     let err = ''
     let timedOut = false
-    const finish = (r: ExecResult) => { if (!settled) { settled = true; clearTimeout(timer); resolve(r) } }
+    const finish = (r: ExecResult) => {
+      if (!settled) {
+        settled = true
+        if (timer !== undefined) clearTimeout(timer)
+        resolve(r)
+      }
+    }
     let child
     try {
       child = spawn(bin, args, { shell: false, env: opts.env ?? process.env, stdio: ['ignore', 'pipe', 'pipe'], signal: opts.signal })
@@ -34,7 +41,7 @@ export function run(bin: string, args: readonly string[], opts: ExecOptions = {}
       finish({ ok: false, code: null, stdout: Buffer.alloc(0), stderr: '', timedOut: false, error: String(e) })
       return
     }
-    const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM') }, timeoutMs)
+    timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM') }, timeoutMs)
     child.stdout.on('data', (b: Buffer) => {
       outLen += b.length
       if (outLen > maxBytes) { child.kill('SIGTERM'); return }

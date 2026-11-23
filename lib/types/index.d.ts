@@ -16,3 +16,4 @@ export declare const name = "ark-dsh";
 export declare const inject: string[];
 export declare function apply(ctx: Context): void;
 export { core, device, maa, guard, box, guide, copilot, planner, strategy };
+export { registerArkTool, getArkToolDeclaration, listArkToolDeclarations, type ArkToolMeta, type ArkToolTier } from './shared/tool-helpers.ts';

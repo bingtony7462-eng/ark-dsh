@@ -8,7 +8,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { AdbBackend, PlayCoverBackend, type DeviceBackend, type BackendProbe } from './backends.ts'
 import { Win32Backend, type Win32Config } from './win32.ts'
 import { checkPng } from '../shared/png.ts'
-import { jsonRender, openObject, asJson } from '../shared/tool-helpers.ts'
+import { jsonRender, openObject, asJson, registerArkTool } from '../shared/tool-helpers.ts'
 import type { ConcreteRuntime } from '../ark-core/index.ts'
 
 export interface ArkDeviceConfig {
@@ -181,7 +181,7 @@ export const toolsPlugin = {
   name: 'ark-device-tools',
   inject: ['tools', 'arkDevice', 'ark'] as const,
   apply(ctx: Context) {
-    ctx.effect(() => ctx.tools.register(defineTool({
+    ctx.effect(() => registerArkTool(ctx, { module: 'ark-device', tier: 'query' }, defineTool({
       name: 'ark_screenshot',
       description: '截取遊戲畫面並檢查有效性（尺寸、全黑、單色）。唯讀。',
       parameters: {},
