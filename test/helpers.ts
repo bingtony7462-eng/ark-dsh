@@ -32,7 +32,7 @@ export function makePng(w: number, h: number, fill: (x: number, y: number) => [n
 
 export interface Boot { ctx: Context; dataDir: string; call(name: string, args?: Record<string, unknown>): Promise<ToolExecutionResult>; dispose(): Promise<void> }
 
-export async function boot(opts: { runtime?: 'auto' | 'adb' | 'playcover' | 'win32' | 'unset'; server?: 'cn' | 'tw' | 'global' | 'jp' | 'unset'; dataDir?: string; maaBin?: string; device?: Record<string, unknown> } = {}): Promise<Boot> {
+export async function boot(opts: { runtime?: 'auto' | 'adb' | 'playcover' | 'win32' | 'unset'; server?: 'cn' | 'tw' | 'global' | 'jp' | 'unset'; dataDir?: string; maaBin?: string; profile?: string; device?: Record<string, unknown> } = {}): Promise<Boot> {
   const dataDir = opts.dataDir ?? mkdtempSync(join(tmpdir(), 'ark-data-'))
   const ctx = new Context()
   ctx.plugin(SystemPrompt)
@@ -40,7 +40,7 @@ export async function boot(opts: { runtime?: 'auto' | 'adb' | 'playcover' | 'win
   const fork = ctx.plugin({ name: 'ark-all', apply(c: Context) {
     c.plugin(core, { server: opts.server ?? 'tw', runtime: opts.runtime ?? 'adb', dataDir } as never)
     c.plugin(device, (opts.device ?? { adb: { adbPath: join(FIX, 'fake-adb.sh'), serial: '127.0.0.1:16384' } }) as never)
-    c.plugin(maa, { binary: opts.maaBin ?? join(FIX, 'fake-maa.sh'), fallbackBinary: '/nonexistent/maa-cli' } as never)
+    c.plugin(maa, { profile: opts.profile ?? 'default', binary: opts.maaBin ?? join(FIX, 'fake-maa.sh'), fallbackBinary: '/nonexistent/maa-cli' } as never)
     for (const p of [guard, box, guide, copilot, planner, strategy]) c.plugin(p)
   } })
   await tick(); await tick()

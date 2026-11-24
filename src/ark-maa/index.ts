@@ -9,6 +9,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { run } from '../shared/exec.ts'
+import { fightArgv, inspectProfile, type FightRequest } from './fight.ts'
 import { parseHelpCommands, parseVersions, deriveRoutes, executionPath } from './probe.ts'
 import { jsonRender, openObject, asJson, registerArkTool } from '../shared/tool-helpers.ts'
 import type {} from '../ark-core/index.ts'
@@ -27,6 +28,7 @@ export interface MaaProbe {
   core_version: string | null
   core_ready: boolean
   config_dir: string | null
+  profile: ReturnType<typeof inspectProfile>
   usage: string | null
   subcommands: string[]
   routes: ReturnType<typeof deriveRoutes> | null
@@ -104,6 +106,7 @@ export class ArkMaa extends Service {
     const base: MaaProbe = {
       found: false, binary: null, version_flag: null, cli_version: null, core_version: null,
       core_ready: false, config_dir: null, usage: null, subcommands: [], routes: null,
+      profile: inspectProfile(null, this.config.profile),
       probed_at: new Date().toISOString(), errors,
       install_hint: installHintForPlatform(),
     }
@@ -125,6 +128,7 @@ export class ArkMaa extends Service {
       core_version: v.core,
       core_ready: coreReady,
       config_dir: dir.ok ? dir.stdout.toString('utf8').trim() : null,
+      profile: inspectProfile(dir.ok ? dir.stdout.toString('utf8').trim() : null, this.config.profile),
       usage: parsed.usage,
       subcommands: Object.keys(parsed.commands),
       routes: Object.keys(parsed.commands).length ? deriveRoutes(parsed.commands) : null,
@@ -139,6 +143,17 @@ export class ArkMaa extends Service {
   async statusForRuntime(signal: AbortSignal, runtime: string): Promise<Record<string, unknown>> {
     const p = await this.probe(signal)
     return { loaded: true, ...p, execution_path: executionPath(runtime, p.routes) }
+  }
+
+  /** P0 唯讀預檢，僅回傳 argv；不執行 fight，也不代表 guard 已批准。 */
+  async buildFightArgs(input: FightRequest, signal: AbortSignal): Promise<string[]> {
+    const device = this.ctx.get('arkDevice')
+    if (!device) throw new Error('ark-device 未載入')
+    const address = await device.fightAddress(signal)
+    const p = await this.probe(signal)
+    if (!p.core_ready || p.routes?.fight !== 'maa fight') throw new Error('MaaCore 或內建 fight 子命令未就緒')
+    if (!p.profile.path || p.profile.error) throw new Error(p.profile.error ?? '缺少指定的 profile')
+    return fightArgv(input, address, p.profile.name)
   }
 
   async status(signal: AbortSignal): Promise<Record<string, unknown>> {

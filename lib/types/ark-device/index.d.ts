@@ -39,6 +39,8 @@ export declare class ArkDevice extends Service {
     private currentBackends;
     get requestedMode(): 'auto' | 'unset' | Kind;
     status(signal: AbortSignal): Promise<Record<string, unknown>>;
+    /** Fight preparation requires explicit ADB mode. Never fall back from a native window. */
+    fightAddress(signal: AbortSignal): Promise<string>;
     /**
      * 探測後端與截圖：
      * - 明確指定後端時：只測該後端，其餘如實標為「未測」。

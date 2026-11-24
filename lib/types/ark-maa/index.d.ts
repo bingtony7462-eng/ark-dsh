@@ -4,6 +4,7 @@
  */
 import { Service, type Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
+import { inspectProfile, type FightRequest } from './fight.ts';
 import { deriveRoutes } from './probe.ts';
 export interface ArkMaaConfig {
     binary: string;
@@ -23,6 +24,7 @@ export interface MaaProbe {
     core_version: string | null;
     core_ready: boolean;
     config_dir: string | null;
+    profile: ReturnType<typeof inspectProfile>;
     usage: string | null;
     subcommands: string[];
     routes: ReturnType<typeof deriveRoutes> | null;
@@ -40,6 +42,8 @@ export declare class ArkMaa extends Service {
     constructor(ctx: Context, config: ArkMaaConfig);
     probe(signal: AbortSignal): Promise<MaaProbe>;
     statusForRuntime(signal: AbortSignal, runtime: string): Promise<Record<string, unknown>>;
+    /** P0 唯讀預檢，僅回傳 argv；不執行 fight，也不代表 guard 已批准。 */
+    buildFightArgs(input: FightRequest, signal: AbortSignal): Promise<string[]>;
     status(signal: AbortSignal): Promise<Record<string, unknown>>;
 }
 export declare const toolsPlugin: {

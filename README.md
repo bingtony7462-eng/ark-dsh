@@ -2,6 +2,12 @@
 
 需求來源：開發規格書 v1.0 + 開發指令 v1.1（衝突時以 v1.1 為準，見文末「規格衝突」）。
 
+## ADB 戰鬥參數預檢（不執行遊戲）
+
+本機已有戰鬥插件的開發者：請以 `await ctx.arkMaa.buildFightArgs({ stage, times, medicine }, signal)` 取代舊的 `run fight --stage` 參數建構器。回傳格式為 `['fight', stage, '--times', …, '--medicine', …, '--stone', '0', '-a', 已連線序號, '-p', 設定的Profile]`。此方法不是批准或執行入口；P0 不註冊戰鬥工具。呼叫端之後仍須執行帳號、門禁與資源上限檢查。
+
+只有明確選用 ADB 才會建立參數。`maa_probe.profile` 顯示指定 profile 的檔案位置或錯誤，不代表內容已驗證。若缺少檔案，請以執行 dsh 的同一 Windows 帳號跑 `maa-cli dir config`，再互動執行 `maa-cli init -n default -f toml`（如有自訂名稱，請替換 `default`；macOS 使用 `maa`），核對 ADB 與臺服設定。不要使用 `--force`，也不必為 Windows 原生視窗模式初始化 ADB。
+
 ## 一鍵安裝（隨插即用，免手改路徑與設定檔）
 
 目前已照社群主流 dsh 插件（`dsh.bundle` + `cordis.patch.yml` + 預編譯 `lib/*.js`）打包，**不需要自己複製 YAML、不需要手改絕對路徑、也不需要在安裝時跑 TypeScript 編譯**：

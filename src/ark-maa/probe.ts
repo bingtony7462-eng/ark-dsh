@@ -28,7 +28,7 @@ export function parseVersions(text: string): { cli: string | null; core: string 
 export function deriveRoutes(commands: Record<string, string>) {
   const has = (c: string) => Object.hasOwn(commands, c)
   return {
-    fight: has('fight') ? 'maa fight' : (has('run') ? 'maa run + task file' : 'unavailable'),
+    fight: has('fight') ? 'maa fight' : 'unavailable',
     copilot: has('copilot') ? 'maa copilot' : 'unavailable',
     infrast: has('infrast') ? 'maa infrast' : (has('run') ? 'maa run + task file' : 'unavailable'),
     recruit: has('recruit') ? 'maa recruit' : (has('run') ? 'maa run + task file' : 'unavailable'),
