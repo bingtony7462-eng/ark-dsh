@@ -1,6 +1,6 @@
 {
   "name": "ark-dsh",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "明日方舟自動遊玩 dsh 隨插即用插件組（v1.1，P0 階段：環境偵測、截圖與狀態落地）",
   "license": "MIT",
