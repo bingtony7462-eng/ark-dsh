@@ -5,6 +5,7 @@
 import { Service, type Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { inspectProfile, type FightRequest } from './fight.ts';
+import { type CopilotRequest, type CopilotPlan } from './copilot.ts';
 import { deriveRoutes } from './probe.ts';
 export interface ArkMaaConfig {
     binary: string;
@@ -44,6 +45,12 @@ export declare class ArkMaa extends Service {
     statusForRuntime(signal: AbortSignal, runtime: string): Promise<Record<string, unknown>>;
     /** P0 唯讀預檢，僅回傳 argv；不執行 fight，也不代表 guard 已批准。 */
     buildFightArgs(input: FightRequest, signal: AbortSignal): Promise<string[]>;
+    /**
+     * P0 唯讀預檢（僅寫 ark-dsh 資料目錄）：固定作業副本、寫 maa run 任務檔並回傳 argv。
+     * maa copilot 不接受 --client-type，所以改用任務檔頂層 client_type 讓非國服載入對應資源。
+     * 不執行作業，也不代表 guard 已批准；執行前須以 verifyPinnedCopilot 再核對雜湊。
+     */
+    buildCopilotArgs(input: CopilotRequest, signal: AbortSignal): Promise<CopilotPlan>;
     status(signal: AbortSignal): Promise<Record<string, unknown>>;
 }
 export declare const toolsPlugin: {
@@ -55,3 +62,5 @@ export declare const name = "ark-maa";
 export declare const inject: string[];
 export declare const Config: z<ArkMaaConfig>;
 export declare function apply(ctx: Context, config: ArkMaaConfig): void;
+export { verifyPinnedCopilot, parseCopilotJson, type CopilotRequest, type CopilotPlan } from './copilot.ts';
+export { resolveClientType, MAA_CLIENT_TYPES, type MaaClientType } from './fight.ts';

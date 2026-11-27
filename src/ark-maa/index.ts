@@ -10,6 +10,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { run } from '../shared/exec.ts'
 import { fightArgv, inspectProfile, resolveClientType, type FightRequest } from './fight.ts'
+import { prepareCopilot, type CopilotRequest, type CopilotPlan } from './copilot.ts'
 import { parseHelpCommands, parseVersions, deriveRoutes, executionPath } from './probe.ts'
 import { jsonRender, openObject, asJson, registerArkTool } from '../shared/tool-helpers.ts'
 import type {} from '../ark-core/index.ts'
@@ -157,6 +158,22 @@ export class ArkMaa extends Service {
     return fightArgv(input, address, p.profile.name, clientType)
   }
 
+  /**
+   * P0 唯讀預檢（僅寫 ark-dsh 資料目錄）：固定作業副本、寫 maa run 任務檔並回傳 argv。
+   * maa copilot 不接受 --client-type，所以改用任務檔頂層 client_type 讓非國服載入對應資源。
+   * 不執行作業，也不代表 guard 已批准；執行前須以 verifyPinnedCopilot 再核對雜湊。
+   */
+  async buildCopilotArgs(input: CopilotRequest, signal: AbortSignal): Promise<CopilotPlan> {
+    const clientType = resolveClientType(this.ctx.ark.effectiveSettings().server, input.clientType)
+    const device = this.ctx.get('arkDevice')
+    if (!device) throw new Error('ark-device 未載入')
+    const address = await device.fightAddress(signal)
+    const p = await this.probe(signal)
+    if (!p.core_ready || !p.subcommands.includes('run')) throw new Error('MaaCore 或 run 子命令未就緒')
+    if (!p.profile.path || p.profile.error) throw new Error(p.profile.error ?? '缺少指定的 profile')
+    return prepareCopilot(this.ctx.ark.config.dataDir, input, clientType, address, p.profile.name)
+  }
+
   async status(signal: AbortSignal): Promise<Record<string, unknown>> {
     return this.statusForRuntime(signal, this.ctx.ark.effectiveSettings().runtime)
   }
@@ -185,3 +202,6 @@ export function apply(ctx: Context, config: ArkMaaConfig) {
   ctx.plugin(toolsPlugin)
   ctx.effect(() => ctx.ark.registerModule('ark-maa', { stage: 'P0', implemented: true, note: '僅探測（含自動路徑搜尋）；執行類工具待 P1（需 ark-guard）' }))
 }
+
+export { verifyPinnedCopilot, parseCopilotJson, type CopilotRequest, type CopilotPlan } from './copilot.ts'
+export { resolveClientType, MAA_CLIENT_TYPES, type MaaClientType } from './fight.ts'
